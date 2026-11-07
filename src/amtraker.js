@@ -22,11 +22,14 @@ const STATION_CODE = /^[A-Z0-9]{2,6}$/;
 
 /** "5", " V15 ", "b5150" → "5", "v15", "b5150"; null when not a train number. */
 export function parseTrainNumber(text) {
+  // "VIA 15" is the VIA Rail train v15, "Brightline 5150" is b5150.
   const match = TRAIN_NUMBER.exec(
     String(text ?? '')
       .trim()
       .toLowerCase()
-      .replace(/^(amtrak|via|brightline)\s*/, '')
+      .replace(/^amtrak\s*/, '')
+      .replace(/^via(\s*rail)?\s*#?(?=\d)/, 'v')
+      .replace(/^brightline\s*#?(?=\d)/, 'b')
       .replace(/^#/, ''),
   );
   return match ? `${match[1]}${Number(match[2])}` : null;

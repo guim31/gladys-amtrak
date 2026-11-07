@@ -92,6 +92,8 @@ export const TEXT = {
   en: {
     serviceDown: ({ error }) => `Amtraker cannot be reached (${error}). Try again in a moment.`,
     arrivedAt: ({ stop, time }) => `Arrived at ${stop} at ${time}`,
+    departedAt: ({ stop, time }) => `Left ${stop} at ${time}`,
+    departedShort: ({ time }) => `Left ${time}`,
     arrivingFrom: ({ origin }) => `from ${origin}`,
     noRun: 'No run in progress',
     noTrain: 'No train announced',
@@ -157,6 +159,8 @@ export const TEXT = {
   fr: {
     serviceDown: ({ error }) => `Amtraker est injoignable (${error}). Réessayez dans un instant.`,
     arrivedAt: ({ stop, time }) => `Arrivé à ${stop} à ${time}`,
+    departedAt: ({ stop, time }) => `Parti de ${stop} à ${time}`,
+    departedShort: ({ time }) => `Parti à ${time}`,
     arrivingFrom: ({ origin }) => `de ${origin}`,
     noRun: 'Aucun trajet en cours',
     noTrain: 'Aucun train annoncé',
@@ -225,6 +229,8 @@ export const TEXT = {
     serviceDown: ({ error }) =>
       `Amtraker ist nicht erreichbar (${error}). Versuch es gleich noch einmal.`,
     arrivedAt: ({ stop, time }) => `Angekommen in ${stop} um ${time}`,
+    departedAt: ({ stop, time }) => `Abgefahren in ${stop} um ${time}`,
+    departedShort: ({ time }) => `Abgefahren um ${time}`,
     arrivingFrom: ({ origin }) => `aus ${origin}`,
     noRun: 'Keine Fahrt unterwegs',
     noTrain: 'Kein Zug angekündigt',
@@ -292,6 +298,8 @@ export const TEXT = {
     serviceDown: ({ error }) =>
       `No se puede contactar con Amtraker (${error}). Inténtelo de nuevo en un momento.`,
     arrivedAt: ({ stop, time }) => `Llegó a ${stop} a las ${time}`,
+    departedAt: ({ stop, time }) => `Salió de ${stop} a las ${time}`,
+    departedShort: ({ time }) => `Salió a las ${time}`,
     arrivingFrom: ({ origin }) => `desde ${origin}`,
     noRun: 'Ningún trayecto en curso',
     noTrain: 'Ningún tren anunciado',

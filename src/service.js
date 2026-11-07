@@ -32,6 +32,7 @@ import {
   STATES,
   allRuns,
   clockTime,
+  currentDelay,
   delayAt,
   etaAt,
   fold,
@@ -66,6 +67,11 @@ const STATIONS_CACHE_MS = 24 * 3600 * 1000;
 // does not show it as stale ("no recent value" after 48 h).
 const HEARTBEAT_MS = 6 * 3600 * 1000;
 const LANGS = ['en', 'fr', 'de', 'es'];
+// Trigger memory of a run unseen this long is forgotten.
+const RUN_MEMORY_MS = 6 * 3600 * 1000;
+// A train missing from one answer while it was there a moment ago keeps its
+// last values this long: Amtraker sometimes drops a train for a cycle.
+const MISSING_GRACE_MS = 10 * 60 * 1000;
 
 export class SceneError extends Error {}
 
@@ -296,6 +302,7 @@ export class AmtrakService {
         logger.debug(`Cannot read Amtraker: ${err.message}`);
       }
       this.lastError = err.message;
+      this.failedAt = this.now();
       return;
     }
     if (this.lastError) {
@@ -315,8 +322,13 @@ export class AmtrakService {
       }
       const runs = parseRuns(trains.byNumber(watch.number));
       const run = pickRun(runs, watch.station);
+      const previous = this.readings.get(key);
+      if (!run && previous?.status && now - (previous.seenAt ?? 0) < MISSING_GRACE_MS) {
+        logger.debug(`Train ${watch.number} missing from Amtraker, last values kept`);
+        continue;
+      }
       const status = trainStatus(run, watch.station, now);
-      this.readings.set(key, { status, at: now });
+      this.readings.set(key, { status, at: now, seenAt: run ? now : previous?.seenAt });
       // A train added while it was not running gets its route name now.
       if (run && !watch.route && run.route) {
         watch.route = run.route;
@@ -383,7 +395,7 @@ export class AmtrakService {
     const events = [];
     const firstNow = !this.checkedNow.has(key);
     this.checkedNow.add(key);
-    const present = new Set(runs.map((run) => run.id));
+    const now = this.now();
     const base = (run) => ({
       train: this.deviceId(watch),
       train_number: rawNumber(run.number),
@@ -393,26 +405,46 @@ export class AmtrakService {
     const delays = this.delayDone.get(key) ?? new Map();
     const approaches = this.approachDone.get(key) ?? new Map();
     const arrivals = this.arrivals.get(key) ?? new Map();
-    for (const map of [delays, approaches, arrivals]) {
-      for (const runId of map.keys()) {
-        if (!present.has(runId)) {
+    this.delayDone.set(key, delays);
+    this.approachDone.set(key, approaches);
+    this.arrivals.set(key, arrivals);
+    // A run missing from one answer (Amtraker hiccup) keeps its memory: it
+    // is forgotten only once unseen for a while.
+    this.seenRuns ??= new Map();
+    const seen = this.seenRuns.get(key) ?? new Map();
+    this.seenRuns.set(key, seen);
+    for (const run of runs) {
+      seen.set(run.id, now);
+    }
+    for (const [runId, at] of seen) {
+      if (now - at > RUN_MEMORY_MS) {
+        seen.delete(runId);
+        for (const map of [delays, approaches, arrivals]) {
           map.delete(runId);
         }
       }
     }
-    this.delayDone.set(key, delays);
-    this.approachDone.set(key, approaches);
-    this.arrivals.set(key, arrivals);
 
+    // Delay: each threshold once per run, fired for the run kept only. Every
+    // run's thresholds are followed silently, so a run becoming the kept one
+    // (the previous one has reached the station) brings no burst of old news.
+    for (const run of runs) {
+      if (run === status?.run) {
+        continue;
+      }
+      const handled = delays.get(run.id) ?? new Set();
+      const delay = currentDelay(run);
+      DELAY_MINUTES.filter((threshold) => delay >= threshold).forEach((t) => handled.add(t));
+      delays.set(run.id, handled);
+    }
     if (status && status.state !== STATES.ARRIVED) {
       const { run } = status;
-      // Delay: each threshold once per run; those already passed at the first
-      // read are marked, not fired.
+      const known = delays.has(run.id);
       const handled = delays.get(run.id) ?? new Set();
       for (const threshold of DELAY_MINUTES) {
         if (status.delay >= threshold && !handled.has(threshold)) {
           handled.add(threshold);
-          if (!firstNow) {
+          if (!firstNow && known) {
             events.push({
               key: TRIGGERS.DELAYED,
               data: {
@@ -435,14 +467,14 @@ export class AmtrakService {
       // fire it; one crossed long before this read (Amtraker down) neither.
       const mine = status.mine;
       if (mine && !mine.reached) {
-        const seen = approaches.get(run.id);
-        if (!seen) {
+        const done = approaches.get(run.id);
+        if (!done) {
           approaches.set(run.id, new Set(APPROACH_MINUTES.filter((m) => mine.minutes <= m)));
         } else {
           const slack = Math.ceil(this.config.refreshSeconds / 60);
           for (const threshold of APPROACH_MINUTES) {
-            if (mine.minutes <= threshold && !seen.has(threshold)) {
-              seen.add(threshold);
+            if (mine.minutes <= threshold && !done.has(threshold)) {
+              done.add(threshold);
               if (mine.minutes >= threshold - slack) {
                 events.push({
                   key: TRIGGERS.APPROACHING,
@@ -464,16 +496,16 @@ export class AmtrakService {
 
     // Arrival at the user's station (at the terminus without one), on every
     // run of the number: the run kept moves on to the next one once its train
-    // has called there.
+    // has called there. The origin is where the train leaves from: no arrival.
     for (const run of runs) {
       const index = watch.station ? stopIndex(run, watch.station) : run.stops.length - 1;
-      if (index === -1) {
+      if (index <= 0) {
         continue;
       }
-      const now = reached(run, index);
+      const there = reached(run, index);
       const before = arrivals.get(run.id);
-      arrivals.set(run.id, now);
-      if (now && before === false) {
+      arrivals.set(run.id, there);
+      if (there && before === false) {
         const stop = run.stops[index];
         events.push({
           key: TRIGGERS.ARRIVED,
@@ -515,9 +547,12 @@ export class AmtrakService {
     }
     const key = watchKey(watch);
     let reading = this.readings.get(key);
+    const interval = this.config.refreshSeconds * 1000;
     if (
       this.isCreated(externalId) &&
-      (!reading || this.now() - reading.at > this.config.refreshSeconds * 2000)
+      (!reading || this.now() - reading.at > 2 * interval) &&
+      // Amtraker down: one attempt per interval, not one per widget view.
+      !(this.lastError && this.now() - this.failedAt < interval)
     ) {
       await this.refresh();
       reading = this.readings.get(key);
@@ -753,7 +788,13 @@ export class AmtrakService {
     const key = watchKey(watch);
     this.watches = this.watches.filter((known) => known !== watch);
     // Added again later, the watch starts afresh: nothing it held is news.
-    for (const map of [this.readings, this.delayDone, this.approachDone, this.arrivals]) {
+    for (const map of [
+      this.readings,
+      this.delayDone,
+      this.approachDone,
+      this.arrivals,
+      this.seenRuns ?? new Map(),
+    ]) {
       map.delete(key);
     }
     this.checkedNow.delete(key);

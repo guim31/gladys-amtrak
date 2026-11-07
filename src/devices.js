@@ -147,7 +147,9 @@ export function stateText(status, language) {
 export function arrivalText(mine, language) {
   const when = clockTime(mine.eta, mine.tz, language);
   if (mine.reached) {
-    return clip(say(TEXT, language, 'arrivedAt', { stop: mine.name, time: when }), MAX_TEXT_STATE);
+    // The origin is where the train leaves from.
+    const key = mine.index === 0 ? 'departedAt' : 'arrivedAt';
+    return clip(say(TEXT, language, key, { stop: mine.name, time: when }), MAX_TEXT_STATE);
   }
   const late = mine.delay > 0 ? ` (+${mine.delay})` : '';
   return clip(`${mine.name} · ${when}${late}`, MAX_TEXT_STATE);
@@ -175,10 +177,6 @@ export function boardEntryText(entry, language) {
 export function trainStates(gladys, watch, status, language) {
   const ids = deviceIds(gladys, watch);
   const states = [
-    {
-      device_feature_external_id: ids.feature('delay'),
-      state: status ? Math.min(status.delay, MAX_DELAY) : 0,
-    },
     { device_feature_external_id: ids.feature('status'), text: stateText(status, language) },
     {
       device_feature_external_id: ids.feature('next_stop'),
@@ -195,6 +193,13 @@ export function trainStates(gladys, watch, status, language) {
             ),
     },
   ];
+  // No run: no delay to record (the delay keeps a history).
+  if (status) {
+    states.unshift({
+      device_feature_external_id: ids.feature('delay'),
+      state: Math.min(status.delay, MAX_DELAY),
+    });
+  }
   if (watch.station) {
     const mine = status?.mine;
     states.push(

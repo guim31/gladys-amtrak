@@ -289,6 +289,9 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Déclencheurs : un événement par seuil (filtres du cœur = égalité). Mémoire par trajet, en RAM seulement ; rien à
   la première lecture. L'arrivée est guettée sur **tous** les trajets du numéro : le trajet retenu passe au suivant
   dès que le sien a atteint la gare.
+- Mémoire des déclencheurs : les seuils de retard de **tous** les trajets sont suivis en silence (pas de rafale
+  quand le trajet suivant prend le relais), et un trajet absent d'une réponse garde sa mémoire 6 h et ses
+  valeurs 10 min (Amtraker saute parfois un train un cycle). Pas d'arrivée à la gare d'origine : « Parti de ».
 - `gladys_version >=5.3.0` à cause de `countries` (US, CA) et `keywords` ; catégorie `transport` (connue de la 5.3.0).
 - Couverture : pictogramme de train maison, pas de logo Amtrak (marque, intégration non officielle).
 

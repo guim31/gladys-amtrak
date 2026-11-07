@@ -476,3 +476,79 @@ test('a language change renames nothing but republishes the texts', async (t) =>
   assert.equal(lastState(world, device, 'status'), 'Im Bahnhof');
   assert.equal(discovered(world, 'Zephyr').features[0].name, 'Verspätung');
 });
+
+test('the next run taking over brings no burst of old delays', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await action(world, 'add_train', { train: '5', station: 'EMY' });
+  await create(world, 'Zephyr');
+  // 5-5 reaches Emeryville: 5-6, already 95 minutes late, becomes the run kept.
+  const [oldest] = world.network.trains['5'];
+  arriveAt(oldest, 'EMY');
+  oldest.trainState = 'Completed';
+  world.clock.advance(2 * 60000);
+  await world.service.refresh();
+  assert.deepEqual(
+    world.fake.sceneEvents.map((event) => event.key),
+    [TRIGGERS.ARRIVED],
+  );
+});
+
+test('a train missing from one answer keeps its values and its trigger memory', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await action(world, 'add_train', { train: '339', station: 'MKE' });
+  const device = await create(world, 'Hiawatha');
+  const run = hiawatha(world);
+  delayRun(run, 40);
+  world.clock.advance(2 * 60000);
+  await world.service.refresh();
+  const fired = world.fake.sceneEvents.length;
+  assert.ok(fired > 0);
+  const saved = world.network.trains['339'];
+  delete world.network.trains['339'];
+  world.clock.advance(2 * 60000);
+  await world.service.refresh();
+  assert.equal(lastState(world, device, 'status'), 'En route');
+  world.network.trains['339'] = saved;
+  arriveAt(run, 'MKE');
+  world.clock.advance(2 * 60000);
+  await world.service.refresh();
+  // Only the arrival is new: the delays already announced stay announced.
+  assert.deepEqual(
+    world.fake.sceneEvents.slice(fired).map((event) => event.key),
+    [TRIGGERS.ARRIVED],
+  );
+  // Gone for good: the device says so after a while.
+  delete world.network.trains['339'];
+  world.clock.advance(12 * 60000);
+  await world.service.refresh();
+  assert.equal(lastState(world, device, 'status'), 'Pas en circulation');
+});
+
+test('a station that is the origin: departure, not arrival', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await action(world, 'add_train', { train: '339', station: 'CHI' });
+  const device = await create(world, 'Hiawatha');
+  assert.equal(lastState(world, device, 'arrival'), 'Parti de Chicago Union à 17:08');
+  world.clock.advance(2 * 60000);
+  await world.service.refresh();
+  assert.deepEqual(world.fake.sceneEvents, []);
+});
+
+test('Amtraker down: a widget view does not wait for a new attempt each time', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await action(world, 'add_train', { train: '5' });
+  const device = await create(world, 'Zephyr');
+  world.network.fail = 503;
+  world.clock.advance(10 * 60000);
+  const get = () =>
+    world.fake.widgetGet('train', { settings: { train: device.external_id }, language: 'fr' });
+  await get();
+  const calls = world.network.calls.length;
+  await get();
+  await world.fake.sceneAction('get_train_status', { train: device.external_id });
+  assert.equal(world.network.calls.length, calls);
+});

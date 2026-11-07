@@ -66,7 +66,9 @@ function trainRows(status, showStops, language) {
       label: clip(mine.name, MAX_LABEL),
       value: clip(
         mine.reached
-          ? t(language, 'arrivedShort', { time: clockTime(mine.eta, mine.tz, language) })
+          ? t(language, mine.index === 0 ? 'departedShort' : 'arrivedShort', {
+              time: clockTime(mine.eta, mine.tz, language),
+            })
           : `${timeWithDelay(mine.eta, mine.tz, mine.delay, language)} · ${t(language, 'minutes', { minutes: mine.minutes })}`,
         40,
       ),
