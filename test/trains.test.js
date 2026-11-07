@@ -29,6 +29,7 @@ test('train numbers and station codes are read leniently, and checked', () => {
   assert.equal(parseTrainNumber('#b5150'), 'b5150');
   assert.equal(parseTrainNumber('VIA 15'), 'v15');
   assert.equal(parseTrainNumber('via rail #15'), 'v15');
+  assert.equal(parseTrainNumber('VIA v15'), 'v15');
   assert.equal(parseTrainNumber('Brightline 5150'), 'b5150');
   assert.equal(parseTrainNumber('5-7'), null);
   assert.equal(parseTrainNumber('../stations'), null);

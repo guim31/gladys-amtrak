@@ -28,8 +28,8 @@ export function parseTrainNumber(text) {
       .trim()
       .toLowerCase()
       .replace(/^amtrak\s*/, '')
-      .replace(/^via(\s*rail)?\s*#?(?=\d)/, 'v')
-      .replace(/^brightline\s*#?(?=\d)/, 'b')
+      .replace(/^via(\s*rail)?\s*#?v?(?=\d)/, 'v')
+      .replace(/^brightline\s*#?b?(?=\d)/, 'b')
       .replace(/^#/, ''),
   );
   return match ? `${match[1]}${Number(match[2])}` : null;

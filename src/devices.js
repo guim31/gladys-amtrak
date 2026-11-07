@@ -193,13 +193,12 @@ export function trainStates(gladys, watch, status, language) {
             ),
     },
   ];
-  // No run: no delay to record (the delay keeps a history).
-  if (status) {
-    states.unshift({
-      device_feature_external_id: ids.feature('delay'),
-      state: Math.min(status.delay, MAX_DELAY),
-    });
-  }
+  // No run: 0, published once (only changes and a heartbeat are sent), so
+  // the last delay of a finished run does not linger in scenes.
+  states.unshift({
+    device_feature_external_id: ids.feature('delay'),
+    state: status ? Math.min(status.delay, MAX_DELAY) : 0,
+  });
   if (watch.station) {
     const mine = status?.mine;
     states.push(
