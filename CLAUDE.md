@@ -31,16 +31,23 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
+index.js                          SDK wiring only: registerHandlers() then connect()
+src/app.js                        every SDK handler -> service; configuration actions
+src/service.js                    watches, refresh timer, devices/states, scene triggers, actions
+src/amtraker.js                   Amtraker v3 client (trains, stations, stale), input checks
+src/trains.js                     runs -> run kept, state, delay, next stop, station board, times
+src/devices.js                    Gladys devices of a watched train / station, their states
 src/scenes.js                     scene action handlers (manifest `scene_actions`)
 src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+src/messages.js                   texts sent from the container (en, fr, de, es)
+src/store.js                      /data/watch.json (atomic, coalesced writes)
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
+gladys-assistant-integration.json manifest: config, actions, widget, scene triggers and action
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (en and fr mandatory)
 test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+test/helpers/world.js             fake Gladys + fake Amtraker on the fixtures + manual clock + /data
+test/helpers/scenario.js          delay, approach and arrival staged on the real Hiawatha 339
+test/fixtures/amtraker            real Amtraker answers of 2026-11-07 ~23:21 UTC
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +77,9 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** is in four languages (English, French, German with
+  "du", Spanish with "usted"): action messages, manifest texts, feature names
+  and `docs/{en,fr,de,es}.md`, kept in sync (`test/i18n.test.js`).
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -251,3 +259,40 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+# Intégration Amtrak (notes de développement, 08/11/2026)
+
+## API : Amtraker v3 (non officielle, sans clé, ODC-By 1.0)
+
+- `https://api.amtraker.com/v3` (docs dans le README de `piemadd/amtrak`). Ne jamais appeler les points d'accès
+  chiffrés d'Amtrak. **Licence ODC-By** depuis le 19/08/2026 : l'utilisateur doit voir que les données viennent
+  d'Amtraker (amtraker.com), « en position visible » : légende et bouton du widget, section du formulaire, état,
+  docs et README. Ne pas retirer ces mentions.
+- `/trains/<numéro>` renvoie `{ "<numéro>": [trajets] }`, et **`[]`** (tableau vide) pour un numéro inconnu ou qui
+  ne roule pas. VIA Rail et Brightline ont un préfixe (`v15`, `b5150`). `/stations/<CODE>` : code **en majuscules**
+  (`chi` → `[]`). `/trains` (tous) : ~1,1 Mo, ~110 ko en gzip, `fetch` de Node décompresse seul.
+- `trainID` = `<numéro>-<jour du mois du départ>` : un train de nuit a plusieurs trajets en même temps (5-5, 5-6,
+  5-7 le 7/11). `trainState` : `Predeparture` (liste un train peu avant son départ, avec des heures estimées et
+  parfois des arrêts déjà en `Station`), `Active`, rarement `Completed` (dont le terminus peut rester `Enroute`).
+  Statut d'arrêt : `Departed`, `Station` (le train y est), `Enroute`. Pas d'annulation publiée : le train disparaît.
+- Heures ISO avec décalage (Brightline en `Z`) ; `arr`/`dep` sont estimées ou réelles. `trainTimely`, `arrCmnt`,
+  `depCmnt` sont obsolètes (vides). Un train en avance donne un retard négatif : affiché 0.
+- `/stale` dit si le flux d'Amtrak est figé : lu seulement par l'action « Afficher les suivis ».
+
+## Choix
+
+- Un appareil par **numéro + gare facultative** (`external_id` `train:5-emy`), un par gare (`station:station-chi`).
+  Trajet retenu : avec gare, le premier qui l'atteindra (un train **à quai** compte encore), sinon le dernier passé ;
+  sans gare, le plus récent en route, sinon le prochain prévu, sinon le dernier arrivé.
+- Lecture : une requête par numéro, ou `/trains` une fois dès qu'une gare est suivie (ou plus de 4 numéros).
+  Amtraker injoignable : état de connexion `false` (objet 4 langues), **rien n'est publié** (consigne).
+- Déclencheurs : un événement par seuil (filtres du cœur = égalité). Mémoire par trajet, en RAM seulement ; rien à
+  la première lecture. L'arrivée est guettée sur **tous** les trajets du numéro : le trajet retenu passe au suivant
+  dès que le sien a atteint la gare.
+- `gladys_version >=5.3.0` à cause de `countries` (US, CA) et `keywords` ; catégorie `transport` (connue de la 5.3.0).
+- Couverture : pictogramme de train maison, pas de logo Amtrak (marque, intégration non officielle).
+
+## Vérifié (08/11/2026)
+
+- API réelle le 7/11 vers 23:20 UTC : California Zephyr 5 (trois trajets), Hiawatha 339, VIA 15 Ocean (arrivé),
+  gare CHI, numéro et gare inconnus (`[]`), en-têtes (gzip, pas de cache Cloudflare).

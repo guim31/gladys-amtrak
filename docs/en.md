@@ -1,61 +1,158 @@
-# Demo Devices Template
+# Amtrak
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+Amtrak trains in real time in Gladys, and VIA Rail (Canada) and Brightline (Florida) trains too:
+delay, state, next stop, expected arrival at your station, and the next trains of a station.
+
+**Data: [Amtraker](https://amtraker.com)**, a free community API by piemadd that
+re-serves the public "Track Your Train" map of Amtrak, under the ODC-By 1.0 licence. **Unofficial:
+this integration is not affiliated with Amtrak, VIA Rail, Brightline or Amtraker.** No account and
+no key.
 
 ## What you get
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+- **A device per watched train** (a train number, and optionally your station): delay (minutes),
+  state (scheduled, en route, at a station, arrived, not running), next stop with its time and,
+  with a station, the expected arrival there (text) and the minutes left (countdown).
+- **A device per watched station**: the next train calling there, in how many minutes, and its
+  delay.
+- **A dashboard widget**: a train with its delay, arrival at your station and next stops, or the
+  board of a station.
+- **Three scene triggers**: train delayed, train approaching my station, train arrived.
+- **A scene action** that reads a train, with a sentence ready to send by message or speaker.
+
+## Requirements
+
+- Gladys Assistant 5.3.0 or later.
+- Internet access from the Gladys host (the integration calls `api.amtraker.com`).
+- A train number, as printed on the timetables and tickets: `5` for the California Zephyr, `v15`
+  for the VIA Rail Ocean (prefix `v`), `b5150` for a Brightline train (prefix `b`).
+
+## Installation
+
+1. In Gladys, open **Integrations → Install from GitHub**.
+2. Paste `https://github.com/guim31/gladys-amtrak` and install.
+3. Open the integration's **Configuration** tab.
 
 ## Configuration
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+### Settings
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+- **Language of the texts**: language of the feature names, of the states (texts) and of the
+  sentences sent to your scenes. Feature names are set when a device is created.
+- **Refresh interval**: 1 or 2 minutes (2 by default). One request per watched train number, or
+  one request for every train as soon as a station is watched.
 
-## Actions
+### Watching a train or a station
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+1. Optional: **Find a station** with a name, a city or a code lists the matching stations with
+   their code (`Chicago` → `Chicago Union [CHI]`).
+2. **Watch a train**: the train number, and optionally the code of your station. With a station,
+   the device also gets the expected arrival there and a countdown, and the "Train approaching my
+   station" trigger works. The station must be on the train's route.
+3. **Watch a station**: the code of a station, for its next trains.
+4. Open the **Discover** tab and create the device.
 
-## Scenes
+A train that is not running right now can be added: Amtraker lists a train shortly before it
+leaves, and the device fills in on its next run. The same train with another station makes another
+device.
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+### Removing a watch, checking the state
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+**Stop watching** takes the name shown by **Show what is watched**, the train number or the
+station code. The device stays in Gladys until you delete it. **Show what is watched** lists the
+trains and stations, their devices, the last read from Amtraker and its last error.
 
-## Dashboard
+## Devices
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+A train number runs several days at once: a long-distance train like the California Zephyr (two
+days and a half) has three runs on the line together. The device follows the run that will reach
+your station first; without a station, the most recent one on the line, else the next one to
+leave, else the last one arrived.
+
+| Feature                           | Type                | Meaning                                                 |
+| --------------------------------- | ------------------- | ------------------------------------------------------- |
+| Delay                             | duration, minutes   | At the next stop (on departure when the train is there) |
+| Status                            | text                | Scheduled, en route, at a station, arrived, not running |
+| Next stop                         | text                | "Galesburg · 16:14", in the station's time zone         |
+| Arrival at my station             | text (with station) | "Emeryville · 17:29 (+32)", or the actual arrival time  |
+| Minutes to my station             | duration (station)  | Countdown, 0 once the train is there or has passed      |
+| Next train in (station)           | duration, minutes   | 1440 when no train is announced                         |
+| Next train (station)              | text                | "5 California Zephyr → Emeryville · 14:00 (+5)"         |
+| Delay of the next train (station) | duration, minutes   | Departure delay, or arrival delay at a terminus         |
+
+An early train shows a delay of 0. Times are those of the station, as on the timetables.
+
+## Dashboard widget
+
+**Amtrak train**: pick a watched train or station. A train shows its state and delay, its arrival
+at your station, then its next stops with their times (hide them with **Show the next stops**);
+green on time, orange from 5 minutes late, red from 30. A station shows its next ten trains (`→`
+departure, `←` arrival at the terminus). The caption names the data source, or an Amtrak alert of
+the train; the **Data: Amtraker** button opens amtraker.com.
+
+## Scene triggers
+
+- **Train delayed**: a watched train is late by the chosen number of minutes or more (5 to 120);
+  once per run and threshold. Variables: train number, route, delay, next stop and its time.
+- **Train approaching my station**: a train watched with a station is the chosen number of minutes
+  from it (5 to 60); once per run and threshold. Variables: train number, route, station, minutes,
+  expected arrival, delay.
+- **Train arrived**: a watched train has reached your station (its terminus when watched without
+  one). Variables: train number, route, station, arrival time, delay.
+
+Nothing fires at the first read after a start: what is already there is not news. A threshold
+crossed long before a read (Amtraker down) is not announced late.
+
+## Scene actions
+
+**Read an Amtrak train** returns, for a watched train, a sentence ("Train 5 California Zephyr: 38
+min late, next stop Galesburg at 4:14 PM. Arrival at Emeryville at 5:29 PM.") and its values:
+number, route, state, delay, next stop and time, station, minutes to the station, arrival time. On
+a watched station, the sentence lists its next three trains and the values describe the next one.
+
+## Scene examples
+
+- When **Train approaching my station** fires with 20 minutes, send "Leave now to pick up Grandma
+  at the station" to your phone.
+- Every morning at 7, **Read an Amtrak train** on your commuter train, then say the sentence on a
+  speaker.
+- When **Train delayed** fires with 30 minutes, postpone the dinner reminder.
+
+## Data, refresh and quotas
+
+Amtraker is a free service run by one person, without a published quota: the integration reads it
+at most once a minute, only for created devices, with one small request per train number (or one
+request of about 110 kB for every train when a station is watched), and identifies itself. Amtrak
+updates a train every few minutes, so a faster refresh would show nothing more. The station list
+of **Find a station** is read at most once a day. Only `/data/watch.json` is written: the watched
+trains and stations. When Amtraker does not answer, the integration status says so and the
+devices keep their last values.
+
+Amtraker data is under the [ODC-By 1.0](https://opendatacommons.org/licenses/by/1-0/) licence:
+the widget, the actions and this page name it.
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **"Not running"**: Amtraker does not list the train right now (it lists it shortly before its
+  departure). Check the number on [amtraker.com](https://amtraker.com).
+- **"is not a station code"**: use **Find a station**; codes are 2 to 6 letters (`CHI`, `NYP`).
+- **"does not call at"**: the station is not on this train's route; the message lists its stops.
+- **The integration is shown offline**: Amtraker cannot be reached; it comes back by itself.
+- **Logs**: the integration logs only its lifecycle; set `LOG_LEVEL=debug` for every read.
+
+## Limits
+
+- **Developed without riding these trains: feedback welcome.** Tested against the real Amtraker
+  API (night train, short train, VIA Rail, station board).
+- Cancellations are not published by Amtraker: a cancelled train simply disappears ("Not
+  running").
+- Unofficial data, re-served from Amtrak's public map: it may lag, or be missing for a while.
+- Up to 10 watches. Feature names are set when the device is created.
+
+## Credits
+
+- Data: [Amtraker](https://amtraker.com) by piemadd
+  ([piemadd/amtrak](https://github.com/piemadd/amtrak)), ODC-By 1.0, from Amtrak's "Track Your
+  Train" map, VIA Rail and Brightline.
+- Amtrak, VIA Rail and Brightline are trademarks of their owners. This integration is not
+  affiliated with them.

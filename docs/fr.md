@@ -1,67 +1,171 @@
-# Template de démonstration
+# Amtrak
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Les trains Amtrak en temps réel dans Gladys, ainsi que ceux de VIA Rail (Canada) et de Brightline
+(Floride) : retard, état, prochain arrêt, arrivée prévue à votre gare, et les prochains trains
+d'une gare.
+
+**Données : [Amtraker](https://amtraker.com)**, une API communautaire gratuite de piemadd qui
+redistribue la carte publique « Track Your Train » d'Amtrak, sous licence ODC-By 1.0. **Non
+officiel : cette intégration n'a aucun lien avec Amtrak, VIA Rail, Brightline ni Amtraker.** Ni
+compte, ni clé.
 
 ## Ce que vous obtenez
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+- **Un appareil par train suivi** (un numéro de train, et en option votre gare) : retard
+  (minutes), état (prévu, en route, en gare, arrivé, pas en circulation), prochain arrêt avec son
+  heure et, avec une gare, l'arrivée prévue là-bas (texte) et les minutes restantes (compte à
+  rebours).
+- **Un appareil par gare suivie** : le prochain train qui la dessert, dans combien de minutes, et
+  son retard.
+- **Un widget de tableau de bord** : un train avec son retard, son arrivée à votre gare et ses
+  prochains arrêts, ou le tableau d'une gare.
+- **Trois déclencheurs de scène** : train en retard, train proche de ma gare, train arrivé.
+- **Une action de scène** qui lit un train, avec une phrase prête à envoyer par message ou sur une
+  enceinte.
+
+## Prérequis
+
+- Gladys Assistant 5.3.0 ou plus récent.
+- Un accès Internet depuis la machine de Gladys (l'intégration appelle `api.amtraker.com`).
+- Un numéro de train, tel qu'imprimé sur les horaires et les billets : `5` pour le California
+  Zephyr, `v15` pour l'Océan de VIA Rail (préfixe `v`), `b5150` pour un train Brightline
+  (préfixe `b`).
+
+## Installation
+
+1. Dans Gladys, ouvrez **Intégrations → Installer depuis GitHub**.
+2. Collez `https://github.com/guim31/gladys-amtrak` et installez.
+3. Ouvrez l'onglet **Configuration** de l'intégration.
 
 ## Configuration
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+### Réglages
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+- **Langue des textes** : langue des noms de fonctionnalités, des états (textes) et des phrases
+  envoyées à vos scènes. Les noms sont fixés à la création de l'appareil.
+- **Fréquence de mise à jour** : 1 ou 2 minutes (2 par défaut). Une requête par numéro de train
+  suivi, ou une seule requête pour tous les trains dès qu'une gare est suivie.
 
-## Actions
+### Suivre un train ou une gare
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+1. Facultatif : **Trouver une gare** avec un nom, une ville ou un code liste les gares
+   correspondantes avec leur code (`Chicago` → `Chicago Union [CHI]`).
+2. **Suivre un train** : le numéro du train, et en option le code de votre gare. Avec une gare,
+   l'appareil reçoit aussi l'arrivée prévue là-bas et un compte à rebours, et le déclencheur
+   « Train proche de ma gare » fonctionne. La gare doit être sur le trajet du train.
+3. **Suivre une gare** : le code d'une gare, pour ses prochains trains.
+4. Ouvrez l'onglet **Découverte** et créez l'appareil.
 
-## Scènes
+Un train qui ne circule pas en ce moment peut être ajouté : Amtraker liste un train peu avant son
+départ, et l'appareil se remplit à son prochain trajet. Le même train avec une autre gare fait un
+autre appareil.
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+### Ne plus suivre, vérifier l'état
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+**Ne plus suivre** prend le nom donné par **Afficher les suivis**, le numéro du train ou le code
+de la gare. L'appareil reste dans Gladys jusqu'à ce que vous le supprimiez. **Afficher les
+suivis** liste les trains et les gares, leurs appareils, la dernière lecture d'Amtraker et sa
+dernière erreur.
 
-## Tableau de bord
+## Appareils
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+Un même numéro de train roule plusieurs jours à la fois : un train grandes lignes comme le
+California Zephyr (deux jours et demi) a trois trajets en même temps sur la ligne. L'appareil suit
+le trajet qui atteindra votre gare le premier ; sans gare, le plus récent sur la ligne, sinon le
+prochain à partir, sinon le dernier arrivé.
+
+| Fonctionnalité                  | Type              | Signification                                             |
+| ------------------------------- | ----------------- | --------------------------------------------------------- |
+| Retard                          | durée, minutes    | Au prochain arrêt (au départ quand le train y est)        |
+| État                            | texte             | Prévu, en route, en gare, arrivé, pas en circulation      |
+| Prochain arrêt                  | texte             | « Galesburg · 16:14 », à l'heure locale de la gare        |
+| Arrivée à ma gare               | texte (avec gare) | « Emeryville · 17:29 (+32) », ou l'heure d'arrivée réelle |
+| Minutes avant ma gare           | durée (avec gare) | Compte à rebours, 0 une fois le train arrivé ou passé     |
+| Prochain train dans (gare)      | durée, minutes    | 1440 quand aucun train n'est annoncé                      |
+| Prochain train (gare)           | texte             | « 5 California Zephyr → Emeryville · 14:00 (+5) »         |
+| Retard du prochain train (gare) | durée, minutes    | Retard au départ, ou à l'arrivée pour un terminus         |
+
+Un train en avance affiche un retard de 0. Les heures sont celles de la gare, comme sur les
+horaires.
+
+## Widget de tableau de bord
+
+**Train Amtrak** : choisissez un train ou une gare suivis. Un train affiche son état et son
+retard, son arrivée à votre gare, puis ses prochains arrêts avec leurs heures (à masquer avec
+**Afficher les prochains arrêts**) ; vert à l'heure, orange dès 5 minutes de retard, rouge dès 30.
+Une gare affiche ses dix prochains trains (`→` départ, `←` arrivée au terminus). La légende nomme
+la source des données, ou une alerte Amtrak du train ; le bouton **Données : Amtraker** ouvre
+amtraker.com.
+
+## Déclencheurs de scène
+
+- **Train en retard** : un train suivi a au moins le nombre de minutes de retard choisi (5 à 120) ; une fois par trajet et par seuil. Variables : numéro, ligne, retard, prochain arrêt et
+  son heure.
+- **Train proche de ma gare** : un train suivi avec une gare en est au nombre de minutes choisi (5
+  à 60) ; une fois par trajet et par seuil. Variables : numéro, ligne, gare, minutes, arrivée
+  prévue, retard.
+- **Train arrivé** : un train suivi a atteint votre gare (son terminus s'il est suivi sans gare).
+  Variables : numéro, ligne, gare, heure d'arrivée, retard.
+
+Rien ne se déclenche à la première lecture après un démarrage : ce qui est déjà là n'est pas une
+nouvelle. Un seuil franchi bien avant une lecture (Amtraker en panne) n'est pas annoncé en retard.
+
+## Actions de scène
+
+**Lire un train Amtrak** renvoie, pour un train suivi, une phrase (« Train 5 California Zephyr :
+38 min de retard, prochain arrêt Galesburg à 16:14. Arrivée à Emeryville à 17:29. ») et ses
+valeurs : numéro, ligne, état, retard, prochain arrêt et heure, gare, minutes avant la gare, heure
+d'arrivée. Sur une gare suivie, la phrase liste ses trois prochains trains et les valeurs décrivent
+le prochain.
+
+## Exemples de scènes
+
+- Quand **Train proche de ma gare** se déclenche à 20 minutes, envoyez « Pars maintenant chercher
+  Mamie à la gare » sur votre téléphone.
+- Chaque matin à 7 h, **Lire un train Amtrak** sur votre train de banlieue, puis dites la phrase
+  sur une enceinte.
+- Quand **Train en retard** se déclenche à 30 minutes, décalez le rappel du dîner.
+
+## Données, rafraîchissement et quotas
+
+Amtraker est un service gratuit tenu par une seule personne, sans quota publié : l'intégration le
+lit au plus une fois par minute, seulement pour les appareils créés, avec une petite requête par
+numéro de train (ou une requête d'environ 110 ko pour tous les trains quand une gare est suivie),
+et elle s'identifie. Amtrak met un train à jour toutes les quelques minutes : un rafraîchissement
+plus rapide n'apporterait rien. La liste des gares de **Trouver une gare** est lue au plus une
+fois par jour. Seul `/data/watch.json` est écrit : les trains et gares suivis. Quand Amtraker ne
+répond pas, l'état de l'intégration le dit et les appareils gardent leurs dernières valeurs.
+
+Les données d'Amtraker sont sous licence
+[ODC-By 1.0](https://opendatacommons.org/licenses/by/1-0/) : le widget, les actions et cette page
+la citent.
 
 ## Dépannage
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+- **« Pas en circulation »** : Amtraker ne liste pas le train en ce moment (il le liste peu avant
+  son départ). Vérifiez le numéro sur [amtraker.com](https://amtraker.com).
+- **« n'est pas un code de gare »** : utilisez **Trouver une gare** ; les codes ont 2 à 6 lettres
+  (`CHI`, `NYP`).
+- **« ne s'arrête pas à »** : la gare n'est pas sur le trajet de ce train ; le message liste ses
+  arrêts.
+- **L'intégration apparaît hors ligne** : Amtraker est injoignable ; elle revient d'elle-même.
+- **Logs** : l'intégration ne journalise que son cycle de vie ; `LOG_LEVEL=debug` pour chaque
+  lecture.
+
+## Limites
+
+- **Développée sans prendre ces trains : vos retours sont les bienvenus.** Testée contre la vraie
+  API Amtraker (train de nuit, train court, VIA Rail, tableau d'une gare).
+- Amtraker ne publie pas les suppressions : un train supprimé disparaît simplement (« Pas en
+  circulation »).
+- Données non officielles, redistribuées depuis la carte publique d'Amtrak : elles peuvent prendre
+  du retard ou manquer un moment.
+- 10 suivis au plus. Les noms des fonctionnalités sont fixés à la création de l'appareil.
+
+## Crédits
+
+- Données : [Amtraker](https://amtraker.com) de piemadd
+  ([piemadd/amtrak](https://github.com/piemadd/amtrak)), ODC-By 1.0, d'après la carte « Track Your
+  Train » d'Amtrak, VIA Rail et Brightline.
+- Amtrak, VIA Rail et Brightline sont des marques de leurs propriétaires. Cette intégration n'a
+  aucun lien avec eux.

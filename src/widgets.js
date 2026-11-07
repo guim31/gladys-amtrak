@@ -1,169 +1,177 @@
 // -----------------------------------------------------------------------------
-// Dashboard widgets (SDK v0.14+, Gladys 5.1+).
+// Dashboard widget (manifest `widgets`, Gladys 5.1+).
 //
-// A widget puts the integration's own data on the Gladys dashboard without a
-// dedicated core widget. The manifest `widgets` field declares its identity
-// (key, label, icon, optional per-instance `settings`); at runtime the
-// integration returns a DECLARATIVE content — `text`, `value`, `gauge`,
-// `status`, `chart`, `card-list`, `image`, `button` — that the core renders
-// with its own theme, dark mode and translations. No HTML, no CSS.
+// - train: one watched train or station.
+//   A train: its status and delay, next stop, arrival at the user's station,
+//   then its next stops (hidden with `show_stops`), green on time, orange
+//   from 5 min late, red from 30 min.
+//   A station: the next trains calling there, with their time and delay.
+//   The heading is the name given in Gladys; the caption, an alert of the
+//   train or the data source; a link button to Amtraker. The source must be
+//   shown where the data is (ODC-By licence of Amtraker).
 //
-// Each entry of WIDGETS is keyed by the widget `key` and exposes:
-//   - get(gladys, { settings, language, units, config }): the content,
-//     registered by index.js with `gladys.onWidgetGet(key, ...)`;
-//   - action(gladys, { actionKey, params, settings, config }) (optional): a
-//     tapped `button` carrying an `action`, registered with
-//     `gladys.onWidgetAction`.
-//
-// Check your contents in the tests with `validateWidgetContent` (exported by
-// the SDK, see test/widgets.test.js), or run with DEBUG=gladys-integration-sdk
-// to have the SDK log every violation of the vocabulary and the budget.
+// Budget of the core: 8 components, 2 texts, one status of 10 rows at most.
 // -----------------------------------------------------------------------------
 
-import {
-  createLogger,
-  DEVICE_FEATURE_CATEGORIES,
-  DEVICE_TRANSPORTS,
-  WIDGET_COLORS,
-} from '@gladysassistant/integration-sdk';
-import { identifyDevice } from './devices/index.js';
-import { weatherStation } from './devices/weatherStation.js';
-import { plug } from './devices/plug.js';
-import { light } from './devices/light.js';
+import { WIDGET_COLORS } from '@gladysassistant/integration-sdk';
+import { STATION_TYPE, clip, stopText, stateText } from './devices.js';
+import { TEXT, say } from './messages.js';
+import { STATES, clockTime, delayAt, etaAt, nextStopIndex, rawNumber } from './trains.js';
 
-const logger = createLogger({ name: 'widgets' });
+export const MAX_ROWS = 10;
+export const MAX_STOPS = 6;
+const MAX_LABEL = 40;
+const AMTRAKER_URL = 'https://amtraker.com';
 
-// Widget key, as declared in the manifest `widgets` field.
-export const DEMO_STATUS_WIDGET = 'demo_status';
+const t = (language, key, params) => say(TEXT, language, key, params);
 
-// Keys of the `button` actions the demo_status content declares.
-const DEMO_STATUS_ACTIONS = { IDENTIFY_LIGHT: 'identify_light' };
-
-// How the plug transport reads in the status list.
-const TRANSPORT_STATUS = {
-  [DEVICE_TRANSPORTS.LOCAL]: { value: { en: 'Local', fr: 'Locale' }, color: WIDGET_COLORS.SUCCESS },
-  [DEVICE_TRANSPORTS.CLOUD]: { value: { en: 'Cloud', fr: 'Cloud' }, color: WIDGET_COLORS.INFO },
-  [DEVICE_TRANSPORTS.UNREACHABLE]: {
-    value: { en: 'Unreachable', fr: 'Injoignable' },
-    color: WIDGET_COLORS.DANGER,
-  },
-};
-
-// A live tile references a feature by its external_id: read it from the
-// discovery payload itself, so the widget and the device never disagree.
-function featureExternalId(gladys, config, blueprint, category) {
-  const device = blueprint.buildDevice(gladys, config);
-  return device.features.find((feature) => feature.category === category).external_id;
+export function delayColor(delay) {
+  if (delay >= 30) {
+    return WIDGET_COLORS.DANGER;
+  }
+  return delay >= 5 ? WIDGET_COLORS.WARNING : WIDGET_COLORS.SUCCESS;
 }
 
-function plugConnectionStatus(gladys, config) {
-  const { transport, degraded } = plug.transport(gladys, config);
-  const { value, color } = TRANSPORT_STATUS[transport];
-  if (degraded) {
-    return {
-      value: { en: `${value.en} (degraded mode)`, fr: `${value.fr} (mode dégradé)` },
-      color: WIDGET_COLORS.WARNING,
-    };
+/** "14:05 (+12)" */
+const timeWithDelay = (at, tz, delay, language) =>
+  `${clockTime(at, tz, language)}${delay > 0 ? ` (+${delay})` : ''}`;
+
+function trainRows(status, showStops, language) {
+  if (!status) {
+    return [
+      {
+        label: t(language, 'rowState'),
+        value: stateText(null, language),
+        color: WIDGET_COLORS.NEUTRAL,
+      },
+    ];
   }
-  return { value, color };
+  const { run, state } = status;
+  const late = status.delay > 0 ? ` · +${status.delay} min` : '';
+  const rows = [
+    {
+      label: t(language, 'rowState'),
+      value: clip(`${stateText(status, language)}${state === STATES.ARRIVED ? '' : late}`, 40),
+      color:
+        state === STATES.SCHEDULED
+          ? WIDGET_COLORS.NEUTRAL
+          : state === STATES.ARRIVED
+            ? WIDGET_COLORS.INFO
+            : delayColor(status.delay),
+    },
+  ];
+  if (status.mine) {
+    const { mine } = status;
+    rows.push({
+      label: clip(mine.name, MAX_LABEL),
+      value: clip(
+        mine.reached
+          ? t(language, 'arrivedShort', { time: clockTime(mine.eta, mine.tz, language) })
+          : `${timeWithDelay(mine.eta, mine.tz, mine.delay, language)} · ${t(language, 'minutes', { minutes: mine.minutes })}`,
+        40,
+      ),
+      icon: 'home',
+      color: mine.reached ? WIDGET_COLORS.INFO : delayColor(mine.delay),
+    });
+  }
+  if (status.next && !showStops) {
+    rows.push({
+      label: t(language, 'rowNext'),
+      value: clip(stopText(status.next, status.next.time, language), 40),
+      color: WIDGET_COLORS.NEUTRAL,
+    });
+  }
+  if (showStops) {
+    const next = nextStopIndex(run);
+    const from = next === -1 ? run.stops.length - 1 : next;
+    for (let index = from; index < run.stops.length && rows.length < MAX_ROWS; index += 1) {
+      const stop = run.stops[index];
+      if (index - from >= MAX_STOPS && index !== run.stops.length - 1) {
+        continue;
+      }
+      const delay = delayAt(run, index);
+      rows.push({
+        label: clip(stop.name, MAX_LABEL),
+        value: timeWithDelay(etaAt(run, index), stop.tz, delay, language),
+        icon: index === run.stops.length - 1 ? 'flag' : 'map-pin',
+        color: stop.code === status.mine?.code ? WIDGET_COLORS.PRIMARY : delayColor(delay),
+      });
+    }
+  }
+  return rows;
+}
+
+function stationRows(board, language) {
+  return board.slice(0, MAX_ROWS).map((entry) => {
+    const { run } = entry;
+    const other = entry.terminus ? run.stops[0].name : run.stops[run.stops.length - 1].name;
+    const when = entry.here
+      ? t(language, 'here')
+      : `${timeWithDelay(entry.at, entry.stop.tz, entry.delay, language)} · ${t(language, 'minutes', { minutes: entry.minutes })}`;
+    return {
+      label: clip(`${rawNumber(run.number)} ${entry.terminus ? '←' : '→'} ${other}`, MAX_LABEL),
+      value: clip(when, 40),
+      icon: entry.terminus ? 'log-in' : 'log-out',
+      color: delayColor(entry.delay),
+    };
+  });
+}
+
+async function trainContent(service, { settings, language }) {
+  const ttl = Math.max(60, service.config.refreshSeconds);
+  if (!settings?.train) {
+    return { ttl_seconds: ttl, components: [{ type: 'text', text: t(language, 'pickTrain') }] };
+  }
+  const found = await service.readingOf(settings.train);
+  if (!found) {
+    return { ttl_seconds: ttl, components: [{ type: 'text', text: t(language, 'gone') }] };
+  }
+  const { watch, reading } = found;
+  const alert = watch.kind === STATION_TYPE ? null : reading?.status?.run.alerts[0];
+  const components = [
+    { type: 'text', variant: 'heading', text: clip(service.displayName(watch), 40) },
+    {
+      type: 'text',
+      variant: 'caption',
+      text: service.lastError
+        ? t(language, 'unavailable')
+        : alert
+          ? clip(`⚠ ${alert}`, 80)
+          : t(language, 'caption'),
+    },
+  ];
+  if (!reading) {
+    components[1] = {
+      type: 'text',
+      variant: 'caption',
+      text: t(language, service.lastError ? 'unavailable' : 'loading'),
+    };
+  } else if (watch.kind === STATION_TYPE) {
+    if (reading.board.length === 0) {
+      components[1] = { type: 'text', variant: 'caption', text: t(language, 'noTrain') };
+    } else {
+      components.push({ type: 'status', items: stationRows(reading.board, language) });
+    }
+  } else {
+    components.push({
+      type: 'status',
+      items: trainRows(
+        reading.status,
+        settings.show_stops !== false && settings.show_stops !== 'false',
+        language,
+      ),
+    });
+  }
+  components.push({
+    type: 'button',
+    label: t(language, 'dataButton'),
+    icon: 'external-link',
+    style: 'secondary',
+    link: { url: AMTRAKER_URL },
+  });
+  return { ttl_seconds: ttl, components };
 }
 
 export const WIDGETS = {
-  [DEMO_STATUS_WIDGET]: {
-    // `settings` holds the per-instance values of the declared `settings`
-    // (none here); `language` and `units` are those of the user viewing the
-    // dashboard, for the values you format yourself. Multi-language objects
-    // (`{ en, fr }`) are picked by the core, like everywhere else.
-    async get(gladys, { config }) {
-      logger.debug(`onWidgetGet <- ${DEMO_STATUS_WIDGET}`);
-      return {
-        // Reload policy: the computed parts below only change with the
-        // config, and index.js nudges the widget on every (re)connection and
-        // config update (see refreshWidgets) — the TTL is just a safety net.
-        ttl_seconds: 300,
-        components: [
-          // Device-bound tiles: LIVE, they follow the published states over
-          // the core's real-time path. No TTL, no nudge involved.
-          {
-            type: 'value',
-            label: { en: 'Temperature', fr: 'Température' },
-            icon: 'thermometer',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              weatherStation,
-              DEVICE_FEATURE_CATEGORIES.TEMPERATURE_SENSOR,
-            ),
-          },
-          {
-            type: 'value',
-            label: { en: 'Office plug', fr: 'Prise du bureau' },
-            icon: 'zap',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              plug,
-              DEVICE_FEATURE_CATEGORIES.ENERGY_SENSOR,
-            ),
-          },
-          // Computed rows: what the integration knows that no device feature
-          // carries. Served from the core cache until the TTL or a nudge.
-          {
-            type: 'status',
-            items: [
-              {
-                label: { en: 'Plug connection', fr: 'Connexion de la prise' },
-                icon: 'wifi',
-                ...plugConnectionStatus(gladys, config),
-              },
-              {
-                label: { en: 'Observed location', fr: 'Position observée' },
-                icon: 'map-pin',
-                value: `${config.latitude.toFixed(2)}, ${config.longitude.toFixed(2)}`,
-                color: WIDGET_COLORS.NEUTRAL,
-              },
-            ],
-          },
-          // `params` are declared HERE and sent back as-is: the handler never
-          // receives user input (a dashboard can hang on a public wall).
-          {
-            type: 'button',
-            label: { en: 'Identify the light', fr: 'Identifier la lampe' },
-            icon: 'eye',
-            style: 'secondary',
-            action: {
-              key: DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT,
-              params: { device: light.deviceExternalId(gladys) },
-            },
-          },
-        ],
-      };
-    },
-
-    // Resolve an optional toast (string or multi-language object, ≤ 200
-    // characters). After a successful action the core drops the cached
-    // content and every open dashboard refetches it: no nudge needed.
-    async action(gladys, { actionKey, params, config }) {
-      logger.info(`onWidgetAction <- ${DEMO_STATUS_WIDGET}.${actionKey}`);
-      if (actionKey === DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT) {
-        return identifyDevice(gladys, params.device, config);
-      }
-      // Throwing acks the action as failed: the message reaches the user.
-      throw new Error(`Unknown widget action: ${actionKey}`);
-    },
-  },
+  train: { get: trainContent },
 };
-
-/**
- * Freshness nudge: ask the core to re-pull every widget NOW instead of
- * waiting for the content TTL. Call it when you KNOW a computed content
- * changed (here: the config, which drives the plug transport and the observed
- * location) — and after every (re)connection, since the nudges are
- * fire-and-forget: rate-limited core-side to 1 per 10 s per widget, dropped
- * silently while disconnected.
- */
-export function refreshWidgets(gladys) {
-  for (const key of Object.keys(WIDGETS)) {
-    gladys.requestWidgetRefresh(key);
-  }
-}
