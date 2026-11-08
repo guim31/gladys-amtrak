@@ -30,6 +30,13 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+The integration needs no account, no key and no password. It stores under
+`/data` a single file, `watch.json`: the train numbers and station codes you
+watch. Its only network traffic is outbound HTTPS to `api.amtraker.com`, the
+unofficial Amtraker API, identified by its `User-Agent`; every request has a
+timeout, and the train numbers and station codes are checked before they are
+put in a URL.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and the Amtraker service the integration reads.

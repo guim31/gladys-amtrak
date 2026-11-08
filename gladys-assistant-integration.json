@@ -1,177 +1,947 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Amtrak",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Amtrak, VIA Rail and Brightline trains in real time: delay, next stop, arrival at your station.",
+    "fr": "Trains Amtrak, VIA Rail et Brightline en temps réel : retard, prochain arrêt, arrivée à votre gare.",
+    "de": "Züge von Amtrak, VIA Rail und Brightline live: Verspätung, nächster Halt, Ankunft an deinem Bahnhof.",
+    "es": "Trenes Amtrak, VIA Rail y Brightline en tiempo real: retraso, próxima parada, llegada a su estación."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
-  "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "docker_image": "ghcr.io/guim31/gladys-amtrak:1.0.0",
+  "gladys_version": ">=5.3.0",
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-amtrak/main/cover.png",
+  "categories": ["transport"],
+  "countries": ["US", "CA"],
+  "keywords": ["train", "Amtrak", "VIA Rail", "Brightline", "railroad", "Amtraker"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "How it works",
+        "fr": "Comment ça marche",
+        "de": "So funktioniert es",
+        "es": "Cómo funciona"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Watch a train by its number (and your station), or a station, with the actions below, then create its device in the Discover tab. Data from Amtraker (amtraker.com), a free community API: unofficial, not affiliated with Amtrak.",
+        "fr": "Suivez un train par son numéro (et votre gare), ou une gare, avec les actions ci-dessous, puis créez son appareil dans l'onglet Découverte. Données d'Amtraker (amtraker.com), API communautaire gratuite : non officiel, sans lien avec Amtrak.",
+        "de": "Verfolge einen Zug über seine Nummer (und deinen Bahnhof) oder einen Bahnhof mit den Aktionen unten und lege dann sein Gerät im Tab „Entdecken“ an. Daten von Amtraker (amtraker.com), einer freien Community-API: inoffiziell, nicht mit Amtrak verbunden.",
+        "es": "Siga un tren por su número (y su estación), o una estación, con las acciones de abajo, y luego cree su dispositivo en la pestaña Descubrir. Datos de Amtraker (amtraker.com), una API comunitaria gratuita: no oficial, sin relación con Amtrak."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://github.com/guim31/gladys-amtrak/blob/main/docs/en.md",
+          "label": {
+            "en": "Setup guide",
+            "fr": "Guide d'installation",
+            "de": "Anleitung",
+            "es": "Guía de instalación"
+          }
+        },
+        {
+          "url": "https://amtraker.com",
+          "label": {
+            "en": "Data: Amtraker",
+            "fr": "Données : Amtraker",
+            "de": "Daten: Amtraker",
+            "es": "Datos: Amtraker"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "language",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "label": {
+        "en": "Language of the texts",
+        "fr": "Langue des textes",
+        "de": "Sprache der Texte",
+        "es": "Idioma de los textos"
+      },
+      "description": {
+        "en": "Language of the feature names, of the states and of the sentences sent to your scenes. Feature names are set when a device is created.",
+        "fr": "Langue des noms de fonctionnalités, des états et des phrases envoyées à vos scènes. Les noms sont fixés à la création de l'appareil.",
+        "de": "Sprache der Funktionsnamen, der Zustände und der Sätze für deine Szenen. Die Namen werden beim Anlegen des Geräts festgelegt.",
+        "es": "Idioma de los nombres de funciones, de los estados y de las frases enviadas a sus escenas. Los nombres se fijan al crear el dispositivo."
+      },
       "required": false,
-      "default": "celsius",
+      "default": "fr",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "refresh_interval",
+      "type": "select",
+      "label": {
+        "en": "Refresh interval",
+        "fr": "Fréquence de mise à jour",
+        "de": "Aktualisierungsintervall",
+        "es": "Intervalo de actualización"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "How often Amtraker is read for your created devices. Amtraker is a free service: keep it gentle.",
+        "fr": "Fréquence de lecture d'Amtraker pour vos appareils créés. Amtraker est un service gratuit : restez raisonnable.",
+        "de": "Wie oft Amtraker für deine angelegten Geräte gelesen wird. Amtraker ist ein freier Dienst: bleib maßvoll.",
+        "es": "Frecuencia de lectura de Amtraker para sus dispositivos creados. Amtraker es un servicio gratuito: sea razonable."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "120",
+      "options": [
+        {
+          "value": "60",
+          "label": {
+            "en": "1 minute",
+            "fr": "1 minute",
+            "de": "1 Minute",
+            "es": "1 minuto"
+          }
+        },
+        {
+          "value": "120",
+          "label": {
+            "en": "2 minutes",
+            "fr": "2 minutes",
+            "de": "2 Minuten",
+            "es": "2 minutos"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
+      "key": "add_train",
+      "label": {
+        "en": "Watch a train",
+        "fr": "Suivre un train",
+        "de": "Zug verfolgen",
+        "es": "Seguir un tren"
+      },
+      "description": {
+        "en": "Watches a train number: its device then appears in the Discover tab. With your station, also its arrival there.",
+        "fr": "Suit un numéro de train : son appareil apparaît alors dans l'onglet Découverte. Avec votre gare, aussi son arrivée là.",
+        "de": "Verfolgt eine Zugnummer: Sein Gerät erscheint dann im Tab „Entdecken“. Mit deinem Bahnhof auch die Ankunft dort.",
+        "es": "Sigue un número de tren: su dispositivo aparece entonces en la pestaña Descubrir. Con su estación, también su llegada."
+      },
+      "timeout_seconds": 30,
       "fields": [
         {
-          "key": "device",
+          "key": "train",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Train number",
+            "fr": "Numéro du train",
+            "de": "Zugnummer",
+            "es": "Número de tren"
+          },
+          "description": {
+            "en": "The number alone for Amtrak (5), with \"v\" for VIA Rail (v15) or \"b\" for Brightline (b5150).",
+            "fr": "Le numéro seul pour Amtrak (5), avec « v » pour VIA Rail (v15) ou « b » pour Brightline (b5150).",
+            "de": "Nur die Nummer für Amtrak (5), mit „v“ für VIA Rail (v15) oder „b“ für Brightline (b5150).",
+            "es": "Solo el número para Amtrak (5), con «v» para VIA Rail (v15) o «b» para Brightline (b5150)."
+          },
+          "placeholder": {
+            "en": "e.g. 5",
+            "fr": "ex. 5",
+            "de": "z. B. 5",
+            "es": "p. ej. 5"
+          }
+        },
+        {
+          "key": "station",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "Your station code (optional)",
+            "fr": "Code de votre gare (facultatif)",
+            "de": "Code deines Bahnhofs (optional)",
+            "es": "Código de su estación (opcional)"
+          },
+          "description": {
+            "en": "Adds the arrival time and the countdown at this station. Find the code with \"Find a station\".",
+            "fr": "Ajoute l'heure d'arrivée et le compte à rebours à cette gare. Trouvez le code avec « Trouver une gare ».",
+            "de": "Fügt Ankunftszeit und Countdown an diesem Bahnhof hinzu. Finde den Code mit „Bahnhof suchen“.",
+            "es": "Añade la hora de llegada y la cuenta atrás en esta estación. Busque el código con «Buscar una estación»."
+          },
+          "placeholder": {
+            "en": "e.g. EMY",
+            "fr": "ex. EMY",
+            "de": "z. B. EMY",
+            "es": "p. ej. EMY"
+          }
+        }
+      ]
+    },
+    {
+      "key": "add_station",
+      "label": {
+        "en": "Watch a station",
+        "fr": "Suivre une gare",
+        "de": "Bahnhof verfolgen",
+        "es": "Seguir una estación"
+      },
+      "description": {
+        "en": "The next trains calling at a station, in a device of their own (Discover tab).",
+        "fr": "Les prochains trains qui desservent une gare, dans un appareil à part (onglet Découverte).",
+        "de": "Die nächsten Züge an einem Bahnhof, in einem eigenen Gerät (Tab „Entdecken“).",
+        "es": "Los próximos trenes que paran en una estación, en un dispositivo propio (pestaña Descubrir)."
+      },
+      "timeout_seconds": 60,
+      "fields": [
+        {
+          "key": "station",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Station code",
+            "fr": "Code de la gare",
+            "de": "Bahnhofscode",
+            "es": "Código de la estación"
+          },
+          "placeholder": {
+            "en": "e.g. CHI",
+            "fr": "ex. CHI",
+            "de": "z. B. CHI",
+            "es": "p. ej. CHI"
+          }
+        }
+      ]
+    },
+    {
+      "key": "find_station",
+      "label": {
+        "en": "Find a station",
+        "fr": "Trouver une gare",
+        "de": "Bahnhof suchen",
+        "es": "Buscar una estación"
+      },
+      "description": {
+        "en": "Lists the stations matching a name, a city or a code, with their code.",
+        "fr": "Liste les gares qui correspondent à un nom, une ville ou un code, avec leur code.",
+        "de": "Listet die Bahnhöfe zu einem Namen, einer Stadt oder einem Code auf, mit ihrem Code.",
+        "es": "Lista las estaciones que coinciden con un nombre, una ciudad o un código, con su código."
+      },
+      "timeout_seconds": 60,
+      "fields": [
+        {
+          "key": "query",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Name, city or code",
+            "fr": "Nom, ville ou code",
+            "de": "Name, Stadt oder Code",
+            "es": "Nombre, ciudad o código"
+          },
+          "placeholder": {
+            "en": "e.g. Chicago",
+            "fr": "ex. Chicago",
+            "de": "z. B. Chicago",
+            "es": "p. ej. Chicago"
+          }
+        }
+      ]
+    },
+    {
+      "key": "remove",
+      "label": {
+        "en": "Stop watching",
+        "fr": "Ne plus suivre",
+        "de": "Nicht mehr verfolgen",
+        "es": "Dejar de seguir"
+      },
+      "description": {
+        "en": "Stops watching a train or a station. Its device stays in Gladys until you delete it.",
+        "fr": "Arrête de suivre un train ou une gare. Son appareil reste dans Gladys jusqu'à ce que vous le supprimiez.",
+        "de": "Beendet das Verfolgen eines Zugs oder Bahnhofs. Sein Gerät bleibt in Gladys, bis du es löschst.",
+        "es": "Deja de seguir un tren o una estación. Su dispositivo permanece en Gladys hasta que usted lo elimine."
+      },
+      "timeout_seconds": 15,
+      "fields": [
+        {
+          "key": "name",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Name, number or code",
+            "fr": "Nom, numéro ou code",
+            "de": "Name, Nummer oder Code",
+            "es": "Nombre, número o código"
+          },
+          "placeholder": {
+            "en": "e.g. 5 or CHI",
+            "fr": "ex. 5 ou CHI",
+            "de": "z. B. 5 oder CHI",
+            "es": "p. ej. 5 o CHI"
+          }
+        }
+      ]
+    },
+    {
+      "key": "status",
+      "label": {
+        "en": "Show what is watched",
+        "fr": "Afficher les suivis",
+        "de": "Verfolgte Einträge anzeigen",
+        "es": "Mostrar los seguimientos"
+      },
+      "description": {
+        "en": "The watched trains and stations, their devices and the last read from Amtraker.",
+        "fr": "Les trains et gares suivis, leurs appareils et la dernière lecture d'Amtraker.",
+        "de": "Die verfolgten Züge und Bahnhöfe, ihre Geräte und die letzte Abfrage bei Amtraker.",
+        "es": "Los trenes y estaciones seguidos, sus dispositivos y la última lectura de Amtraker."
+      },
+      "timeout_seconds": 30
+    }
+  ],
+  "widgets": [
+    {
+      "key": "train",
+      "label": {
+        "en": "Amtrak train",
+        "fr": "Train Amtrak",
+        "de": "Amtrak-Zug",
+        "es": "Tren Amtrak"
+      },
+      "description": {
+        "en": "A train's delay, next stops and arrival at your station, or a station's next trains.",
+        "fr": "Retard, prochains arrêts et arrivée à votre gare d'un train, ou prochains trains d'une gare.",
+        "de": "Verspätung, nächste Halte und Ankunft eines Zugs, oder die nächsten Züge eines Bahnhofs.",
+        "es": "Retraso, próximas paradas y llegada de un tren, o próximos trenes de una estación."
+      },
+      "icon": "navigation",
+      "settings": [
+        {
+          "key": "train",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "required": true,
+          "label": {
+            "en": "Train or station",
+            "fr": "Train ou gare",
+            "de": "Zug oder Bahnhof",
+            "es": "Tren o estación"
+          }
+        },
+        {
+          "key": "show_stops",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "label": {
+            "en": "Show the next stops",
+            "fr": "Afficher les prochains arrêts",
+            "de": "Nächste Halte anzeigen",
+            "es": "Mostrar las próximas paradas"
+          },
+          "description": {
+            "en": "For a train: its next stops with their times.",
+            "fr": "Pour un train : ses prochains arrêts avec leurs heures.",
+            "de": "Für einen Zug: seine nächsten Halte mit Zeiten.",
+            "es": "Para un tren: sus próximas paradas con sus horas."
+          }
         }
       ]
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "train_delayed",
+      "label": {
+        "en": "Train delayed",
+        "fr": "Train en retard",
+        "de": "Zug verspätet",
+        "es": "Tren con retraso"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A watched train is late by the chosen number of minutes or more: once per run.",
+        "fr": "Un train suivi a au moins le nombre de minutes de retard choisi : une fois par trajet.",
+        "de": "Ein verfolgter Zug hat mindestens die gewählte Verspätung: einmal pro Fahrt.",
+        "es": "Un tren seguido acumula al menos los minutos de retraso elegidos: una vez por trayecto."
       },
       "fields": [
         {
-          "key": "device",
+          "key": "train",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "required": false,
+          "label": {
+            "en": "Train or station",
+            "fr": "Train ou gare",
+            "de": "Zug oder Bahnhof",
+            "es": "Tren o estación"
+          }
         },
         {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "key": "threshold",
+          "type": "select",
+          "required": true,
+          "label": {
+            "en": "Late by at least",
+            "fr": "Retard d'au moins",
+            "de": "Verspätung ab",
+            "es": "Retraso de al menos"
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "5",
+              "label": {
+                "en": "5 min",
+                "fr": "5 min",
+                "de": "5 Min.",
+                "es": "5 min"
+              }
+            },
+            {
+              "value": "10",
+              "label": {
+                "en": "10 min",
+                "fr": "10 min",
+                "de": "10 Min.",
+                "es": "10 min"
+              }
+            },
+            {
+              "value": "15",
+              "label": {
+                "en": "15 min",
+                "fr": "15 min",
+                "de": "15 Min.",
+                "es": "15 min"
+              }
+            },
+            {
+              "value": "20",
+              "label": {
+                "en": "20 min",
+                "fr": "20 min",
+                "de": "20 Min.",
+                "es": "20 min"
+              }
+            },
+            {
+              "value": "30",
+              "label": {
+                "en": "30 min",
+                "fr": "30 min",
+                "de": "30 Min.",
+                "es": "30 min"
+              }
+            },
+            {
+              "value": "45",
+              "label": {
+                "en": "45 min",
+                "fr": "45 min",
+                "de": "45 Min.",
+                "es": "45 min"
+              }
+            },
+            {
+              "value": "60",
+              "label": {
+                "en": "60 min",
+                "fr": "60 min",
+                "de": "60 Min.",
+                "es": "60 min"
+              }
+            },
+            {
+              "value": "90",
+              "label": {
+                "en": "90 min",
+                "fr": "90 min",
+                "de": "90 Min.",
+                "es": "90 min"
+              }
+            },
+            {
+              "value": "120",
+              "label": {
+                "en": "120 min",
+                "fr": "120 min",
+                "de": "120 Min.",
+                "es": "120 min"
+              }
+            }
           ]
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "train_number",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Train number",
+            "fr": "Numéro du train",
+            "de": "Zugnummer",
+            "es": "Número de tren"
+          }
+        },
+        {
+          "key": "route_name",
+          "type": "string",
+          "label": {
+            "en": "Route",
+            "fr": "Ligne",
+            "de": "Strecke",
+            "es": "Línea"
+          }
+        },
+        {
+          "key": "delay_minutes",
+          "type": "number",
+          "label": {
+            "en": "Delay (minutes)",
+            "fr": "Retard (minutes)",
+            "de": "Verspätung (Minuten)",
+            "es": "Retraso (minutos)"
+          }
+        },
+        {
+          "key": "next_stop",
+          "type": "string",
+          "label": {
+            "en": "Next stop",
+            "fr": "Prochain arrêt",
+            "de": "Nächster Halt",
+            "es": "Próxima parada"
+          }
+        },
+        {
+          "key": "next_stop_time",
+          "type": "string",
+          "label": {
+            "en": "Time at the next stop",
+            "fr": "Heure au prochain arrêt",
+            "de": "Zeit am nächsten Halt",
+            "es": "Hora en la próxima parada"
+          }
+        }
+      ]
+    },
+    {
+      "key": "train_approaching",
+      "label": {
+        "en": "Train approaching my station",
+        "fr": "Train proche de ma gare",
+        "de": "Zug nähert sich meinem Bahnhof",
+        "es": "Tren cerca de mi estación"
+      },
+      "description": {
+        "en": "A watched train is the chosen number of minutes from your station (train watched with a station).",
+        "fr": "Un train suivi est à N minutes de votre gare (train suivi avec une gare).",
+        "de": "Ein verfolgter Zug ist N Minuten von deinem Bahnhof entfernt (Zug mit Bahnhof verfolgt).",
+        "es": "Un tren seguido está a N minutos de su estación (tren seguido con una estación)."
+      },
+      "fields": [
+        {
+          "key": "train",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Train or station",
+            "fr": "Train ou gare",
+            "de": "Zug oder Bahnhof",
+            "es": "Tren o estación"
+          }
+        },
+        {
+          "key": "threshold",
+          "type": "select",
+          "required": true,
+          "label": {
+            "en": "Arrives in",
+            "fr": "Arrive dans",
+            "de": "Ankunft in",
+            "es": "Llega en"
+          },
+          "options": [
+            {
+              "value": "5",
+              "label": {
+                "en": "5 min",
+                "fr": "5 min",
+                "de": "5 Min.",
+                "es": "5 min"
+              }
+            },
+            {
+              "value": "10",
+              "label": {
+                "en": "10 min",
+                "fr": "10 min",
+                "de": "10 Min.",
+                "es": "10 min"
+              }
+            },
+            {
+              "value": "15",
+              "label": {
+                "en": "15 min",
+                "fr": "15 min",
+                "de": "15 Min.",
+                "es": "15 min"
+              }
+            },
+            {
+              "value": "20",
+              "label": {
+                "en": "20 min",
+                "fr": "20 min",
+                "de": "20 Min.",
+                "es": "20 min"
+              }
+            },
+            {
+              "value": "30",
+              "label": {
+                "en": "30 min",
+                "fr": "30 min",
+                "de": "30 Min.",
+                "es": "30 min"
+              }
+            },
+            {
+              "value": "45",
+              "label": {
+                "en": "45 min",
+                "fr": "45 min",
+                "de": "45 Min.",
+                "es": "45 min"
+              }
+            },
+            {
+              "value": "60",
+              "label": {
+                "en": "60 min",
+                "fr": "60 min",
+                "de": "60 Min.",
+                "es": "60 min"
+              }
+            }
+          ]
+        }
+      ],
+      "variables": [
+        {
+          "key": "train_number",
+          "type": "string",
+          "label": {
+            "en": "Train number",
+            "fr": "Numéro du train",
+            "de": "Zugnummer",
+            "es": "Número de tren"
+          }
+        },
+        {
+          "key": "route_name",
+          "type": "string",
+          "label": {
+            "en": "Route",
+            "fr": "Ligne",
+            "de": "Strecke",
+            "es": "Línea"
+          }
+        },
+        {
+          "key": "station_name",
+          "type": "string",
+          "label": {
+            "en": "Station",
+            "fr": "Gare",
+            "de": "Bahnhof",
+            "es": "Estación"
+          }
+        },
+        {
+          "key": "minutes",
+          "type": "number",
+          "label": {
+            "en": "Minutes to the station",
+            "fr": "Minutes avant la gare",
+            "de": "Minuten bis zum Bahnhof",
+            "es": "Minutos hasta la estación"
+          }
+        },
+        {
+          "key": "expected_time",
+          "type": "string",
+          "label": {
+            "en": "Expected arrival",
+            "fr": "Arrivée prévue",
+            "de": "Erwartete Ankunft",
+            "es": "Llegada prevista"
+          }
+        },
+        {
+          "key": "delay_minutes",
+          "type": "number",
+          "label": {
+            "en": "Delay (minutes)",
+            "fr": "Retard (minutes)",
+            "de": "Verspätung (Minuten)",
+            "es": "Retraso (minutos)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "train_arrived",
+      "label": {
+        "en": "Train arrived",
+        "fr": "Train arrivé",
+        "de": "Zug angekommen",
+        "es": "Tren llegado"
+      },
+      "description": {
+        "en": "A watched train has reached your station, or its terminus when watched without a station.",
+        "fr": "Un train suivi a atteint votre gare, ou son terminus s'il est suivi sans gare.",
+        "de": "Ein verfolgter Zug hat deinen Bahnhof erreicht, ohne Bahnhof seinen Endbahnhof.",
+        "es": "Un tren seguido ha llegado a su estación, o a su destino si se sigue sin estación."
+      },
+      "fields": [
+        {
+          "key": "train",
+          "type": "select",
+          "source": "devices",
+          "required": false,
+          "label": {
+            "en": "Train or station",
+            "fr": "Train ou gare",
+            "de": "Zug oder Bahnhof",
+            "es": "Tren o estación"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "train_number",
+          "type": "string",
+          "label": {
+            "en": "Train number",
+            "fr": "Numéro du train",
+            "de": "Zugnummer",
+            "es": "Número de tren"
+          }
+        },
+        {
+          "key": "route_name",
+          "type": "string",
+          "label": {
+            "en": "Route",
+            "fr": "Ligne",
+            "de": "Strecke",
+            "es": "Línea"
+          }
+        },
+        {
+          "key": "station_name",
+          "type": "string",
+          "label": {
+            "en": "Station",
+            "fr": "Gare",
+            "de": "Bahnhof",
+            "es": "Estación"
+          }
+        },
+        {
+          "key": "arrival_time",
+          "type": "string",
+          "label": {
+            "en": "Arrival time",
+            "fr": "Heure d'arrivée",
+            "de": "Ankunftszeit",
+            "es": "Hora de llegada"
+          }
+        },
+        {
+          "key": "delay_minutes",
+          "type": "number",
+          "label": {
+            "en": "Delay (minutes)",
+            "fr": "Retard (minutes)",
+            "de": "Verspätung (Minuten)",
+            "es": "Retraso (minutos)"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "get_train_status",
+      "label": {
+        "en": "Read an Amtrak train",
+        "fr": "Lire un train Amtrak",
+        "de": "Amtrak-Zug abfragen",
+        "es": "Leer un tren Amtrak"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "A watched train (or station) as values and a sentence ready to send: \"Train 5 California Zephyr: 38 min late, next stop Galesburg at 4:14 PM.\"",
+        "fr": "Un train (ou une gare) suivi en valeurs et en phrase prête à envoyer : « Train 5 California Zephyr : 38 min de retard, prochain arrêt Galesburg à 16:14. »",
+        "de": "Ein verfolgter Zug (oder Bahnhof) als Werte und als fertiger Satz: „Zug 5 California Zephyr: 38 Min. Verspätung, nächster Halt Galesburg um 16:14.“",
+        "es": "Un tren (o estación) seguido en valores y en una frase lista: «Tren 5 California Zephyr: 38 min de retraso, próxima parada Galesburg a las 16:14.»"
+      },
+      "timeout_seconds": 30,
       "fields": [
         {
-          "key": "device",
+          "key": "train",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "required": true,
+          "label": {
+            "en": "Train or station",
+            "fr": "Train ou gare",
+            "de": "Zug oder Bahnhof",
+            "es": "Tren o estación"
+          }
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "sentence",
+          "type": "string",
+          "label": {
+            "en": "Sentence",
+            "fr": "Phrase",
+            "de": "Satz",
+            "es": "Frase"
+          }
+        },
+        {
+          "key": "train_number",
+          "type": "string",
+          "label": {
+            "en": "Train number",
+            "fr": "Numéro du train",
+            "de": "Zugnummer",
+            "es": "Número de tren"
+          }
+        },
+        {
+          "key": "route_name",
+          "type": "string",
+          "label": {
+            "en": "Route",
+            "fr": "Ligne",
+            "de": "Strecke",
+            "es": "Línea"
+          }
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "label": {
+            "en": "Status",
+            "fr": "État",
+            "de": "Status",
+            "es": "Estado"
+          }
+        },
+        {
+          "key": "delay_minutes",
+          "type": "number",
+          "label": {
+            "en": "Delay (minutes)",
+            "fr": "Retard (minutes)",
+            "de": "Verspätung (Minuten)",
+            "es": "Retraso (minutos)"
+          }
+        },
+        {
+          "key": "next_stop",
+          "type": "string",
+          "label": {
+            "en": "Next stop",
+            "fr": "Prochain arrêt",
+            "de": "Nächster Halt",
+            "es": "Próxima parada"
+          }
+        },
+        {
+          "key": "next_stop_time",
+          "type": "string",
+          "label": {
+            "en": "Time at the next stop",
+            "fr": "Heure au prochain arrêt",
+            "de": "Zeit am nächsten Halt",
+            "es": "Hora en la próxima parada"
+          }
+        },
+        {
+          "key": "station_name",
+          "type": "string",
+          "label": {
+            "en": "Station",
+            "fr": "Gare",
+            "de": "Bahnhof",
+            "es": "Estación"
+          }
+        },
+        {
+          "key": "minutes_to_station",
+          "type": "number",
+          "label": {
+            "en": "Minutes to my station",
+            "fr": "Minutes avant ma gare",
+            "de": "Minuten bis zu meinem Bahnhof",
+            "es": "Minutos hasta mi estación"
+          }
+        },
+        {
+          "key": "arrival_time",
+          "type": "string",
+          "label": {
+            "en": "Arrival time",
+            "fr": "Heure d'arrivée",
+            "de": "Ankunftszeit",
+            "es": "Hora de llegada"
+          }
         }
       ]
-    }
-  ],
-  "widgets": [
-    {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
-      },
-      "icon": "activity",
-      "action_timeout_seconds": 15
     }
   ]
 }
